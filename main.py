@@ -1,6 +1,10 @@
 #!/usr/bin/env python3
 
 import argparse
+import configparser
+import os
+
+from datetime import datetime
 from typing import Union
 
 # Import interface modules
@@ -19,7 +23,9 @@ from utils.logging_service import LoggingService
 from utils.llm_connector.openai_connector import OpenAIConnector
 
 class SearchTool:
-    def __init__(self, use_speech: bool = False):
+    def __init__(self, args: argparse.Namespace):
+        self.args = args
+        self.config = self.load_db_config()
         self.interface = CLI()
         self.nl_parser = NLParser()
         self.query_translator = GraphQLTranslator()
@@ -28,7 +34,13 @@ class SearchTool:
         self.metadata_analyzer = MetadataAnalyzer()
         self.facet_generator = FacetGenerator()
         self.result_ranker = ResultRanker()
-        self.upi_connector = UPIConnector()
+        self.upi_connector = UPIConnector(
+            host = self.config['host'],
+            port = self.config['port'],
+            username = self.config['user_name'],
+            password = self.config['user_password'],
+            database = self.config['database']
+        )
         self.logging_service = LoggingService()
         self.llm_connector = OpenAIConnector()
 
@@ -64,12 +76,16 @@ class SearchTool:
 
         self.logging_service.log_session_end()
 
+    def load_db_config(self, config_file: str = './config/indaleko-db-config.ini') -> None:
+        assert os.path.exists(config_file), f"Config file not found: {config_file}"
+        config = configparser.ConfigParser()
+        config.read(config_file)
+        self.db_config = config['Database']
+
 def main():
     parser = argparse.ArgumentParser(description="UPI Search Tool")
-    parser.add_argument("--speech", action="store_true", help="Use speech interface")
     args = parser.parse_args()
-
-    search_tool = SearchTool(use_speech=args.speech)
+    search_tool = SearchTool(args)
     search_tool.run()
 
 if __name__ == "__main__":
